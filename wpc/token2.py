@@ -1,11 +1,12 @@
-from wpc.principal import principal
-from wpc.sd import sd
+from wpc.principal import Principal
+from wpc.sd import SD
 import ntsecuritycon
 import win32security
 import wpc.conf
+import wpc.utils
 
 
-class token:
+class Token(object):
     def __init__(self, th):
         self.th = th  # token handle
         self.token_type = None
@@ -40,8 +41,9 @@ class token:
         if not self.sd:
             try:
                 # TODO also get mandatory label
-                secdesc = win32security.GetSecurityInfo(self.get_th(), win32security.SE_KERNEL_OBJECT, win32security.DACL_SECURITY_INFORMATION | win32security.OWNER_SECURITY_INFORMATION | win32security.GROUP_SECURITY_INFORMATION)
-                self.sd = sd('token', secdesc)
+                secdesc = win32security.GetSecurityInfo(self.get_th(), win32security.SE_KERNEL_OBJECT,
+                                                        win32security.DACL_SECURITY_INFORMATION | win32security.OWNER_SECURITY_INFORMATION | win32security.GROUP_SECURITY_INFORMATION)
+                self.sd = SD('token', secdesc)
             except:
                 pass
         return self.sd
@@ -73,7 +75,7 @@ class token:
                         attr_str_a.append("RESOURCE")
                     if attr & 0xC0000000:
                         attr_str_a.append("LOGON_ID")
-                    self.token_groups.append((principal(sid), attr_str_a))
+                    self.token_groups.append((Principal(sid), attr_str_a))
             except:
                 pass
         return self.token_groups
@@ -94,10 +96,11 @@ class token:
     def get_token_impersonation_level(self):
         if not self.token_impersonation_level and self.get_th():
             try:
-                self.token_impersonation_level = win32security.GetTokenInformation(self.get_th(), ntsecuritycon.TokenImpersonationLevel)
+                self.token_impersonation_level = win32security.GetTokenInformation(self.get_th(),
+                                                                                   ntsecuritycon.TokenImpersonationLevel)
                 if self.token_impersonation_level is None:
                     return "[N/A not impersonating]"
-                if self.token_impersonation_level >=0 and self.token_impersonation_level <= 3:
+                if 0 <= self.token_impersonation_level <= 3:
                     return wpc.conf.SECURITY_IMPERSONATION_LEVEL[self.token_impersonation_level]
             except:
                 pass
@@ -106,7 +109,8 @@ class token:
     def get_token_restrictions(self):
         if not self.token_restrictions and self.get_th():
             try:
-                self.token_restrictions = win32security.GetTokenInformation(self.get_th(), ntsecuritycon.TokenHasRestrictions)
+                self.token_restrictions = win32security.GetTokenInformation(self.get_th(),
+                                                                            ntsecuritycon.TokenHasRestrictions)
             except:
                 pass
         return self.token_restrictions
@@ -116,7 +120,7 @@ class token:
             try:
                 tups = win32security.GetTokenInformation(self.get_th(), ntsecuritycon.TokenRestrictedSids)
                 for sid, i in tups:
-                    self.token_restricted_sids.append(principal(sid))
+                    self.token_restricted_sids.append(Principal(sid))
             except:
                 pass
         return self.token_restricted_sids
@@ -124,7 +128,8 @@ class token:
     def get_token_elevation_type(self):
         if not self.token_elevation_type and self.get_th():
             try:
-                self.token_elevation_type = win32security.GetTokenInformation(self.get_th(), ntsecuritycon.TokenElevationType)
+                self.token_elevation_type = win32security.GetTokenInformation(self.get_th(),
+                                                                              ntsecuritycon.TokenElevationType)
                 if self.token_elevation_type == 1:
                     self.token_elevation_type = "TokenElevationTypeDefault"
                 elif self.token_elevation_type == 2:
@@ -148,7 +153,8 @@ class token:
     def get_token_linked_token(self):
         if not self.token_linked_token and self.get_th():
             try:
-                self.token_linked_token = win32security.GetTokenInformation(self.get_th(), ntsecuritycon.TokenLinkedToken)
+                self.token_linked_token = win32security.GetTokenInformation(self.get_th(),
+                                                                            ntsecuritycon.TokenLinkedToken)
             except:
                 pass
         return self.token_linked_token
@@ -173,7 +179,7 @@ class token:
         if not self.token_integrity_level and self.get_th():
             try:
                 sid, i = win32security.GetTokenInformation(self.get_th(), ntsecuritycon.TokenIntegrityLevel)
-                self.token_integrity_level = principal(sid)
+                self.token_integrity_level = Principal(sid)
             except:
                 pass
         return self.token_integrity_level
@@ -222,50 +228,51 @@ class token:
     # http://support.microsoft.com/kb/326256
     def get_token_privileges(self):
         if self.token_privileges == [] and self.get_th():
-            #try:
-                privs = win32security.GetTokenInformation(self.get_th(), ntsecuritycon.TokenPrivileges)
+            # try:
+            privs = win32security.GetTokenInformation(self.get_th(), ntsecuritycon.TokenPrivileges)
 
-                for priv_tuple in privs:
-                    attr_str_a = []
-                    priv_val = priv_tuple[0]
-                    attr = priv_tuple[1]
-                    attr_str = "unknown_attr(" + str(attr) + ")"
-                    if attr == 0:
-                        attr_str_a.append("[disabled but not removed]")
-                    if attr & 1:
-                        attr_str_a.append("ENABLED_BY_DEFAULT")
-                    if attr & 2:
-                        attr_str_a.append("ENABLED")
-                    if attr & 0x80000000:
-                        attr_str_a.append("USED_FOR_ACCESS")
-                    if attr & 4:
-                        attr_str_a.append("REMOVED")
+            for priv_tuple in privs:
+                attr_str_a = []
+                priv_val = priv_tuple[0]
+                attr = priv_tuple[1]
+                attr_str = "unknown_attr(" + str(attr) + ")"
+                if attr == 0:
+                    attr_str_a.append("[disabled but not removed]")
+                if attr & 1:
+                    attr_str_a.append("ENABLED_BY_DEFAULT")
+                if attr & 2:
+                    attr_str_a.append("ENABLED")
+                if attr & 0x80000000:
+                    attr_str_a.append("USED_FOR_ACCESS")
+                if attr & 4:
+                    attr_str_a.append("REMOVED")
 
-                    self.token_privileges.append((win32security.LookupPrivilegeName(wpc.conf.remote_server, priv_val), attr_str_a))
+                self.token_privileges.append(
+                    (win32security.LookupPrivilegeName(wpc.conf.remote_server, priv_val), attr_str_a))
 
-            #except:
-            #    pass
+        # except:
+        #    pass
         return self.token_privileges
 
     def get_token_user(self):
         if not self.token_user and self.get_th():
             sidObj, intVal = win32security.GetTokenInformation(self.get_th(), ntsecuritycon.TokenUser)
             if sidObj:
-                self.token_user = principal(sidObj)
+                self.token_user = Principal(sidObj)
         return self.token_user
 
     def get_token_primary_group(self):
         if not self.token_primary_group and self.get_th():
             sidObj = win32security.GetTokenInformation(self.get_th(), ntsecuritycon.TokenPrimaryGroup)
             if sidObj:
-                self.token_primary_group = principal(sidObj)
+                self.token_primary_group = Principal(sidObj)
         return self.token_primary_group
 
     def get_token_owner(self):
         if not self.token_owner and self.get_th():
             sidObj = win32security.GetTokenInformation(self.get_th(), ntsecuritycon.TokenOwner)
             if sidObj:
-                self.token_owner = principal(sidObj)
+                self.token_owner = Principal(sidObj)
         return self.token_owner
 
     def as_text_no_rec(self):
@@ -299,7 +306,7 @@ class token:
         for g, attr_a in self.get_token_groups():
             t += "\t%s: %s\n" % (g.get_fq_name(), "|".join(attr_a))
         if self.get_token_linked_token():
-            t += token(self.get_token_linked_token()).as_text_no_rec2()
+            t += Token(self.get_token_linked_token()).as_text_no_rec2()
         t += '--- End Access Token ---\n'
         return t
 
@@ -320,7 +327,7 @@ class token:
         t += "TokenElevationType: " + str(self.get_token_elevation_type()) + "\n"
         t += "TokenUIAccess: " + str(self.get_token_ui_access()) + "\n"
         t += "TokenLinkedToken: " + str(self.get_token_linked_token()) + "\n"
-        #if self.get_token_linked_token():
+        # if self.get_token_linked_token():
         #    t += token(self.get_token_linked_token()).as_text_no_rec2()
         t += "TokenLogonSid: " + str(self.get_token_logon_sid()) + "\n"
         t += "TokenElevation: " + str(self.get_token_elevation()) + "\n"
@@ -354,7 +361,7 @@ class token:
         t += "TokenUIAccess: " + str(self.get_token_ui_access()) + "\n"
         t += "TokenLinkedToken: " + str(self.get_token_linked_token()) + "\n"
         if self.get_token_linked_token():
-            t += token(self.get_token_linked_token()).as_text_no_rec3()
+            t += Token(self.get_token_linked_token()).as_text_no_rec3()
         t += "TokenLogonSid: " + str(self.get_token_logon_sid()) + "\n"
         t += "TokenElevation: " + str(self.get_token_elevation()) + "\n"
         t += "TokenIntegrityLevel: " + str(self.get_token_integrity_level().get_fq_name()) + "\n"
@@ -410,15 +417,15 @@ class token:
             t += self.get_sd().as_text()
         if self.get_token_linked_token():
             t += "\nDumping linked access token:\n"
-            t += token(self.get_token_linked_token()).as_text_no_rec()
+            t += Token(self.get_token_linked_token()).as_text_no_rec()
         t += '--- End Access Token ---\n'
 
-        #print "token: as_text returning %s" % t
+        # print "token: as_text returning %s" % t
         return t
 
     def get_type(self):
         return 'token'
-    
+
     def as_tab(self, dangerous_only=1):
         lines = []
 
@@ -456,22 +463,24 @@ class token:
         info.append(self.get_token_mandatory_policy())
         info.append(self.get_token_restricted())
 
-# Will cause an infinite loop
-#        t =""
-#        if self.get_token_linked_token():
-#            t += token(self.get_token_linked_token()).as_tab()
-#        info.append(t)
+        # Will cause an infinite loop
+        #        t =""
+        #        if self.get_token_linked_token():
+        #            t += token(self.get_token_linked_token()).as_tab()
+        #        info.append(t)
 
         lines.append(wpc.utils.tab_line(*info))
         for sid in self.get_token_restricted_sids():
             lines.append(wpc.utils.tab_line("info", "token_restricted_sid", self.get_th_int(), sid.get_fq_name()))
         for g, attr_a in self.get_token_groups():
-            lines.append(wpc.utils.tab_line("info", "token_group", self.get_th_int(), g.get_fq_name(), "|".join(attr_a)))
+            lines.append(
+                wpc.utils.tab_line("info", "token_group", self.get_th_int(), g.get_fq_name(), "|".join(attr_a)))
         for p, a in self.get_token_privileges():
             lines.append(wpc.utils.tab_line("info", "token_privs", self.get_th_int(), p, "|".join(a)))
         if self.get_sd():
             lines.append(wpc.utils.tab_line("gotsd", self.get_type(), str(self.get_th_int()), "yes"))
-            lines.append(wpc.utils.tab_line("owner", self.get_type(), str(self.get_th_int()), str(self.get_sd().get_owner().get_fq_name())))         
+            lines.append(wpc.utils.tab_line("owner", self.get_type(), str(self.get_th_int()),
+                                            str(self.get_sd().get_owner().get_fq_name())))
             if self.get_sd().has_dacl():
                 lines.append(wpc.utils.tab_line("hasdacl", self.get_type(), str(self.get_th_int()), "yes"))
                 if dangerous_only:
@@ -482,5 +491,5 @@ class token:
                 lines.append(wpc.utils.tab_line("hasdacl", self.get_type(), str(self.get_th_int()), "no"))
         else:
             lines.append(wpc.utils.tab_line("gotsd", self.get_type(), str(self.get_th_int()), "no"))
-        #print lines
+        # print lines
         return "\n".join(lines)

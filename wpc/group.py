@@ -1,12 +1,10 @@
-from wpc.principal import principal
-from wpc.user import user
-import ntsecuritycon
-import win32security
 import wpc.conf
+from wpc.principal import Principal
+from wpc.user import User
 
 
 # These have members
-class group(principal):
+class Group(Principal):
     def get_members(self):
 #        print "get_members called for %s" % self.get_fq_name()
         return self.get_members_except([self])
@@ -35,11 +33,11 @@ class group(principal):
 #            print "[D] member[sid]: %s" % member['sid']
             if wpc.conf.sid_is_group_type[member['sidusage']]:
 #                print "[D] b2"
-                p = group(member['sid'])
+                p = Group(member['sid'])
 #                print "[D] b21"
             else:
 #                print "[D] b3"
-                p = user(member['sid'])
+                p = User(member['sid'])
 #                print "[D] b31"
 
             #for i in ignore_principals:
@@ -61,7 +59,7 @@ class group(principal):
         for p in principals:
  #           print "[D] d"
             if p.is_group_type():
-                g = group(member['sid'])
+                g = Group(member['sid'])
 #                print "[D] %s has member %s (Group)" % (self.get_fq_name(), g.get_fq_name())
 #                principals.append(g)
                 for new_principals in g.get_members_except(ignore_principals):

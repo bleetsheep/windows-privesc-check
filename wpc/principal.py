@@ -1,12 +1,10 @@
 import win32security
-import ntsecuritycon
-import _winreg
-import win32service
-import win32con
+
 import wpc.conf
 
+
 # These have sids, perhaps a domain
-class principal:
+class Principal:
     def __init__(self, sid):
         self.name = None
 #        self.info = None

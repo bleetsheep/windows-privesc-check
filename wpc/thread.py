@@ -1,16 +1,17 @@
-from wpc.file import file as File
-from wpc.sd import sd
-from wpc.token import token
-import win32api
-import win32con
-import win32security
-import wpc.utils
 import ctypes
+import win32security
+
+import win32con
+
+import wpc.utils
+from wpc.sd import SD
+from wpc.token2 import Token
 
 OpenThread = ctypes.windll.kernel32.OpenThread
 #OpenThreadToken = ctypes.windll.advapi32.OpenThreadToken
 
-class thread:
+
+class Thread(object):
     def __init__(self, tid):
         self.tid = tid
         self.th = None
@@ -34,7 +35,7 @@ class thread:
             try:
                 secdesc = win32security.GetSecurityInfo(self.get_th(), win32security.SE_KERNEL_OBJECT, win32security.DACL_SECURITY_INFORMATION | win32security.OWNER_SECURITY_INFORMATION | win32security.GROUP_SECURITY_INFORMATION)
                 #print "[D] secdesc: %s" % secdesc
-                self.sd = sd('thread', secdesc)
+                self.sd = SD('thread', secdesc)
             except:
                 pass
         #print "[D] get_sd returning: %s" % self.sd
@@ -74,7 +75,6 @@ class thread:
 
     def get_tth(self):
         if not self.tth:
-            import sys
             import pywintypes
             try:
                 self.tth = win32security.OpenThreadToken(self.get_th(), win32con.MAXIMUM_ALLOWED, True)
@@ -97,7 +97,7 @@ class thread:
     def get_token(self):
         if not self.token:
             if self.get_tth():
-                self.token = token(self.get_tth())
+                self.token = Token(self.get_tth())
         #print "thread get_token: %s" % self.token
         return self.token
 

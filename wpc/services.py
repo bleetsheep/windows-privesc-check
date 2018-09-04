@@ -1,9 +1,9 @@
-from wpc.service import service
+from wpc.service import Service
 import win32service
 import wpc.conf
 
 
-class services:
+class Services:
     def __init__(self):
         self.scm = None
         self.type = win32service.SERVICE_WIN32
@@ -19,11 +19,11 @@ class services:
     def add_all(self):
         for s in win32service.EnumServicesStatus(self.get_scm(), self.get_type(), win32service.SERVICE_STATE_ALL):
             short_name = s[0]
-            self.add(service(self.get_scm(), short_name))
+            self.add(Service(self.get_scm(), short_name))
 
     def get_services(self):
         # populate self.services with a complete list of services if we haven't already
-        if self.services == []:
+        if not self.services:
             self.add_all()
 
         return self.services
@@ -45,8 +45,9 @@ class services:
         pass
 
 
-class drivers(services):
+class Drivers(Services):
     def __init__(self):
+        Services.__init__(self)
         self.type = win32service.SERVICE_DRIVER
         self.scm = None
         self.services = []

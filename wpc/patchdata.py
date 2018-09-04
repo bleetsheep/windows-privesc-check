@@ -1,11 +1,11 @@
 import subprocess
 import os
 import re
-from wpc.mspatchdb import mspatchdb
+from wpc.mspatchdb import MSPatchDb
 
 
 # These have members
-class patchdata():
+class PatchData(object):
     def __init__(self, opts):
         self.installed_patches = []
         self.os = {}
@@ -20,9 +20,9 @@ class patchdata():
         if 'patchdb' in opts.keys():
             self.db = opts['patchdb']
         elif 'patchfile' in opts.keys():
-            self.db = mspatchdb({'file': opts['patchfile']})
+            self.db = MSPatchDb({'file': opts['patchfile']})
         else:
-            self.db = mspatchdb()
+            self.db = MSPatchDb()
 
     def record_installed_patch(self, patch):
         # TODO dedup

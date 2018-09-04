@@ -1,14 +1,14 @@
-from wpc.report.issueAcl import issueAcl
-from wpc.sd import sd
 import ntsecuritycon
 import win32api
 import win32con
 import win32security
 import wpc.conf
+from wpc.report.issueAcl import IssueAcl
+import wpc.utils
 
 
 # regkeys or directories
-class regkey:
+class RegKey(object):
     def __init__(self, key_string, **kwargs):
         # print "[D] Created regkey obj for " + name
         self.sd = None
@@ -82,7 +82,7 @@ class regkey:
             if al == []:
                 return None
             else:
-                return issueAcl(self.get_name(), al)
+                return IssueAcl(self.get_name(), al)
 
     def dump(self):
         print self.as_text()
@@ -98,7 +98,7 @@ class regkey:
         try:
             subkeys = win32api.RegEnumKeyEx(self.get_keyh())
             for subkey in subkeys:
-                subkey_objects.append(regkey(self.get_name() + "\\" + subkey[0], view=self.view))
+                subkey_objects.append(RegKey(self.get_name() + "\\" + subkey[0], view=self.view))
         except:
             pass
         return subkey_objects
@@ -172,8 +172,7 @@ class regkey:
         return 'regkey'
     
     def as_tab(self, dangerous_only=1):
-        lines = []
-        lines.append(wpc.utils.tab_line("info", self.get_type(), str(self.get_name())))
+        lines = [wpc.utils.tab_line("info", self.get_type(), str(self.get_name()))]
         if self.get_sd():
             lines.append(wpc.utils.tab_line("gotsd", self.get_type(), str(self.get_name()), "yes"))
             lines.append(wpc.utils.tab_line("owner", self.get_type(), str(self.get_name()), str(self.get_sd().get_owner().get_fq_name())))         

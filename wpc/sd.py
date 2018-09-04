@@ -1,12 +1,14 @@
-from wpc.ace import ace
-from wpc.acelist import acelist
-from wpc.principal import principal
+from wpc.ace import Ace
+from wpc.acelist import AceList
+from wpc.principal import Principal
 import win32security
 import wpc.conf
 
 
-class sd(acelist):
+class SD(AceList):
+
     def __init__(self, type, secdesc):
+        AceList.__init__(self)
         self.type = type
         self.sd = secdesc
         self.owner = None
@@ -16,19 +18,20 @@ class sd(acelist):
         self.dacl = None
         self.acelist = None
         self.untrusted_owner = None
+        self.owner_name = None
 
     def get_aces(self):
-        if self.acelist == None:
-            self.acelist = acelist()
+        if self.acelist is None:
+            self.acelist = AceList()
             dacl = self.get_dacl()
             if dacl:  # Some files will have no DACL - e.g. on HGFS file systems
                 for ace_no in range(0, self.dacl.GetAceCount()):
                     #print "[D] ACE #%d" % ace_no
-                    self.acelist.add(ace(self.get_type(), dacl.GetAce(ace_no)))
+                    self.acelist.add(Ace(self.get_type(), dacl.GetAce(ace_no)))
         return self.acelist.get_aces()
 
     def get_acelist(self):
-        if self.acelist == None:
+        if self.acelist is None:
             self.get_aces()  # side effect is defining self.acelist
         return self.acelist
 
@@ -50,12 +53,12 @@ class sd(acelist):
         else:
             s += "Group:   [none] \n"
 
-        for a in self.get_aces_dangerous():
+        for a in self.get_dangerous_perms_read():
             s += a.as_text() + "\n"
         return s
 
     def dump(self):
-        print self.as_text()
+        print(self.as_text())
     
     def has_no_dacl(self):
         if self.get_dacl():
@@ -89,7 +92,7 @@ class sd(acelist):
         return self.sd
 
     def get_dacl(self):
-        if self.dacl == None:
+        if self.dacl is None:
             self.dacl = self.get_sd().GetSecurityDescriptorDacl()
         return self.dacl
 
@@ -97,7 +100,7 @@ class sd(acelist):
         if not self.owner:
             owner_sid = self.get_owner_sid()
             if owner_sid:
-                self.owner = principal(self.get_owner_sid())
+                self.owner = Principal(self.get_owner_sid())
             else:
                 self.owner = None
         return self.owner
@@ -106,18 +109,18 @@ class sd(acelist):
         if not self.group:
             group_sid = self.get_group_sid()
             if group_sid:
-                self.group = principal(self.get_group_sid())
+                self.group = Principal(self.get_group_sid())
             else:
                 self.group = None
         return self.group
 
     def get_group_sid(self):
-        if self.group_sid == None:
+        if self.group_sid is None:
             self.group_sid = self.get_sd().GetSecurityDescriptorGroup()
         return self.group_sid
 
     def get_owner_sid(self):
-        if self.owner_sid == None:
+        if self.owner_sid is None:
             self.owner_sid = self.get_sd().GetSecurityDescriptorOwner()
         return self.owner_sid
 
@@ -129,7 +132,7 @@ class sd(acelist):
         return owner_domain + "\\" + owner_name
 
     def get_owner_name(self):
-        if self.owner_name == None:
+        if self.owner_name is None:
             self.owner_name = win32security.ConvertSidToStringSid(self.get_owner_sid)
         return self.owner_name
 

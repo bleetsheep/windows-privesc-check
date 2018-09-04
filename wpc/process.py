@@ -1,7 +1,7 @@
-from wpc.file import file as File
-from wpc.sd import sd
-from wpc.token import token
-from wpc.thread import thread
+from wpc.file import File as File
+from wpc.sd import SD
+from wpc.token2 import Token
+from wpc.thread import Thread
 import win32api
 import win32con
 import win32process
@@ -9,6 +9,7 @@ import win32security
 import wpc.utils
 import ctypes
 import win32job
+
 
 class THREADENTRY32(ctypes.Structure):
     _fields_ = [
@@ -21,7 +22,8 @@ class THREADENTRY32(ctypes.Structure):
         ("dwFlags", ctypes.c_ulong)
     ]
 
-class process:
+
+class Process(object):
     def __init__(self, pid):
         self.pid = pid
         self.ph = None
@@ -112,7 +114,7 @@ class process:
     def get_threads(self):
         if not self.threads:
             for t in self.get_thread_ids():
-                self.add_thread(thread(t))
+                self.add_thread(Thread(t))
         return self.threads
 
     def set_wts_name(self, wts_name):
@@ -143,7 +145,7 @@ class process:
         if not self.sd:
             try:
                 secdesc = win32security.GetSecurityInfo(self.get_ph(), win32security.SE_KERNEL_OBJECT, win32security.DACL_SECURITY_INFORMATION | win32security.OWNER_SECURITY_INFORMATION | win32security.GROUP_SECURITY_INFORMATION)
-                self.sd = sd('process', secdesc)
+                self.sd = SD('process', secdesc)
             except:
                 pass
         return self.sd
@@ -248,7 +250,7 @@ class process:
     def get_token(self):
         if not self.token:
             if self.get_pth():
-                self.token = token(self.get_pth())
+                self.token = Token(self.get_pth())
         return self.token
 
     def as_text(self):

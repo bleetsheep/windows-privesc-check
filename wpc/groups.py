@@ -1,16 +1,17 @@
-from wpc.group import group
+from __future__ import print_function
 import win32net
-import wpc.conf
 import pywintypes
+import wpc.conf
+from wpc.group import Group
 
 
-class groups():
+class Groups(object):
     def __init__(self):
         self.groups = []
 
     # TODO need to call with level GROUP_INFO_3.  This will get SID and save the slow call to LookupAccountName.
     def get_all(self):
-        if self.groups == []:
+        if not self.groups:
             try:
                 level = 0
                 resume = 0
@@ -19,13 +20,13 @@ class groups():
                     for u in grouplist:
                         try:
                             sid, name, type = wpc.conf.cache.LookupAccountName(wpc.conf.remote_server, u['name'])
-                            self.groups.append(group(sid))
+                            self.groups.append(Group(sid))
                         except:
-                            print "[E] failed to lookup sid of %s" % group['name']
+                            print("[E] failed to lookup sid of %s" % Group['name'])
                     if resume == 0:
                         break
             except pywintypes.error as e:
-                print "[E] %s: %s" % (e[1], e[2])
+                print("[E] %s: %s" % (e[1], e[2]))
             try:
                 level = 0
                 resume = 0
@@ -34,11 +35,11 @@ class groups():
                     for u in grouplist:
                         try:
                             sid, name, type = wpc.conf.cache.LookupAccountName(wpc.conf.remote_server, u['name'])
-                            self.groups.append(group(sid))
+                            self.groups.append(Group(sid))
                         except:
-                            print "[E] failed to lookup sid of %s" % group['name']
+                            print("[E] failed to lookup sid of %s" % Group['name'])
                     if resume == 0:
                         break
             except pywintypes.error as e:
-                print "[E] %s: %s" % (e[1], e[2])
+                print("[E] %s: %s" % (e[1], e[2]))
         return self.groups

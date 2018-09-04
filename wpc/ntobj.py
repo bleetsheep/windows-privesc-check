@@ -1,11 +1,11 @@
+from __future__ import print_function
+
 import ctypes
-import win32con
-import sys
-from binascii import hexlify
 import win32security
+
 import wpc.conf
-import win32event
-from wpc.sd import sd
+import wpc.utils
+from wpc.sd import SD
 
 # TODO
 # Give perms correct names
@@ -18,6 +18,7 @@ USHORT = ctypes.c_ushort
 PUNICODE_STRING = LPCWSTR = LPWSTR = PWSTR = ctypes.c_wchar_p
 PSTR = ctypes.c_char_p
 PVOID = LPCVOID = LPVOID = ctypes.c_void_p
+
 
 class UNICODE_STRING(ctypes.Structure):
     _pack_ = 1
@@ -136,32 +137,36 @@ def get_unicode_null(ansi_str):
         tmp = tmp + c + "\x00"
     tmp = tmp + "\x00\x00"
     return tmp
+
+
 def get_uni_string_struct(s, uni_string):
     
     #s = UNICODE_STRING()
     s.Length = len(uni_string) * 2
     s.MaximumLength = len(uni_string) * 2 + 2
-    print "path: %s" % uni_string
+    print("path: %s" % uni_string)
     path_unicode_null = ctypes.create_string_buffer(s.MaximumLength)
 
     tmp = get_unicode_null(uni_string)
 
-    print "tmp: %s" % repr(tmp)
+    print("tmp: %s" % repr(tmp))
     fit = min(len(tmp), s.MaximumLength)
-    print "fit: %s" % fit
+    print("fit: %s" % fit)
     ctypes.memmove(ctypes.addressof(path_unicode_null), tmp, fit)
 
-    print "1: %s" % repr(path_unicode_null.raw)
+    print("1: %s" % repr(path_unicode_null.raw))
     s.Buffer = ctypes.addressof(path_unicode_null)
-    print "2: %s" % repr(path_unicode_null)
-    print "3: %s" % repr(s.Buffer)
-    print "Blengh: %s" % s.Length
-    print "Bmaxlengh: %s" % s.MaximumLength
-    print "Abuffer: %s" % repr(ctypes.cast(s.Buffer, PWSTR).value)
+    print("2: %s" % repr(path_unicode_null))
+    print("3: %s" % repr(s.Buffer))
+    print("Blengh: %s" % s.Length)
+    print("Bmaxlengh: %s" % s.MaximumLength)
+    print("Abuffer: %s" % repr(ctypes.cast(s.Buffer, PWSTR).value))
     #print "Bbuffer: %s%s%s%s" % (s.Buffer[0], s.Buffer[1], s.Buffer[2], s.Buffer[3])
-    print s
+    print()
     return ctypes.addressof(s)
-class ntobj:
+
+
+class NTObj(object):
     def __init__(self, path, objtype=None):
         self.sd = None
         self.path = None
@@ -182,7 +187,7 @@ class ntobj:
         return self.path
 
     def type_is_implemented(self):
-        if (self.get_type() == "Semaphore" or self.get_type() == "Event" or self.get_type() == "Mutant" or self.get_type() == "Timer" or self.get_type() == "Section"  or self.get_type() == "Device" or self.get_type() == "SymbolicLink" or self.get_type() == "Key" or self.get_type() == "Directory"):
+        if self.get_type() == "Semaphore" or self.get_type() == "Event" or self.get_type() == "Mutant" or self.get_type() == "Timer" or self.get_type() == "Section"  or self.get_type() == "Device" or self.get_type() == "SymbolicLink" or self.get_type() == "Key" or self.get_type() == "Directory":
             return 1
         return 0
     
@@ -229,7 +234,7 @@ class ntobj:
             handle = self.get_objh()
         except pywintypes.error as e:
             #print "get_sd: can't get handle"
-            print "[E] %s: %s" % (e[1], e[2])
+            print ("[E] %s: %s" % (e[1], e[2]))
             return 0
         #print "get_sd handle: %s" % handle
         s = None
@@ -239,7 +244,7 @@ class ntobj:
             t = self.get_type().lower()
             if t == "directory":
                 t = "directory_object"
-            s = sd(t, s)
+            s = SD(t, s)
         except:
             pass
             # print "[E] can't get sd"
@@ -264,12 +269,12 @@ class ntobj:
         return self.parent_obj
 
     def dump(self):
-        print self.as_text()
+        print(self.as_text())
 
     # BUG: sometimes we pass ANSI and sometimes UNICODE.  UNICODE fails because we add extra zeros
     def get_objh(self):
         if not self.objh:
-            if self.get_type() == None or self.get_type() == "Directory":
+            if self.get_type() is None or self.get_type() == "Directory":
                 s = UNICODE_STRING()
                 s.Length = len(self.get_path()) * 2
                 s.MaximumLength = len(self.get_path()) * 2 + 2
@@ -460,7 +465,9 @@ class ntobj:
                 else:
                     pass
                     # print "return status for NtOpenFile: %s (0 = success, non-zero = error)" % ret
-            elif self.get_type() == "Key": # TODO: this errors: ValueError: Procedure probably called with not enough arguments (8 bytes missing)
+            elif self.get_type() == "Key":
+                # TODO: this errors:
+                # ValueError: Procedure probably called with not enough arguments (8 bytes missing)
                 s = UNICODE_STRING()
                 s.Length = len(self.get_path()) * 2
                 s.MaximumLength = len(self.get_path()) * 2 + 2
@@ -620,7 +627,7 @@ class ntobj:
                     pass
                     #print "return status for NtOpenMutant: %s (0 = success, non-zero = error)" % ret
             elif self.get_type() == "Timer":
-                print "[D] TIMER"
+                print("[D] TIMER")
                 #self.objh = win32event.OpenWaitableTimer(0x00020000, False, self.get_name_no_path()) # BUG: only works for objects in \BaseNamedObjects
                 s = UNICODE_STRING()
                 s.Length = len(self.get_path()) * 2
@@ -648,7 +655,7 @@ class ntobj:
                 ret = NtOpenTimer(ctypes.addressof(ctypes_objh), desired_access, ctypes.addressof(o))
                 if ret == 0:
                     self.objh = ctypes_objh.value
-                    print "[D] TIMER handle: %s" % self.objh
+                    print ("[D] TIMER handle: %s" % self.objh)
                 else:
                     pass
                     #print "return status for NtOpenTimer: %s (0 = success, non-zero = error)" % ret
@@ -687,7 +694,7 @@ class ntobj:
                 receiveSome(object_name, outbuffer.raw[count * 8: (count + 1) * 8])
                 receiveSome(object_type, outbuffer.raw[(count + 1) * 8: (count + 2) * 8])
                 if object_name.Length:
-                    child_objects.append(ntobj(self.get_path().rstrip("\\") + "\\" + ctypes.cast(object_name.Buffer, PWSTR).value, ctypes.cast(object_type.Buffer, PWSTR).value))
+                    child_objects.append(NTObj(self.get_path().rstrip("\\") + "\\" + ctypes.cast(object_name.Buffer, PWSTR).value, ctypes.cast(object_type.Buffer, PWSTR).value))
                 else:
                     done = 1
                 count = count + 2
@@ -716,12 +723,11 @@ class ntobj:
             #print "get_name_no_path returning: %s" % m.group(1)
             return m.group(1)
         else:
-            print "get_name_no_path returning null for: %s" % self.get_path()
+            print("get_name_no_path returning null for: %s" % self.get_path())
             return None
 
     def as_tab(self, dangerous_only=1):
-        lines = []
-        lines.append(wpc.utils.tab_line("info", self.get_type(), str(self.get_name())))
+        lines = [wpc.utils.tab_line("info", self.get_type(), str(self.get_name()))]
         if self.get_sd():
             lines.append(wpc.utils.tab_line("gotsd", self.get_type(), str(self.get_name()), "yes"))
             lines.append(wpc.utils.tab_line("owner", self.get_type(), str(self.get_name()), str(self.get_sd().get_owner().get_fq_name())))         

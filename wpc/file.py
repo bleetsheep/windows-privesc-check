@@ -1,12 +1,14 @@
-from wpc.report.fileAcl import fileAcl
-from wpc.sd import sd
+from __future__ import print_function
 import os
 import win32security
+
 import wpc.conf
+import wpc.utils
+from wpc.report.fileAcl import FileAcl
 
 
 # files or directories
-class file:
+class File:
     def __init__(self, name):
         # print "[D] Created file obj for " + name
         self.name = str(name).replace("\x00", "")
@@ -41,7 +43,7 @@ class file:
         return s
 
     def dump(self):
-        print self.as_text()
+        print(self.as_text())
 
     def get_name(self):
         return self.name
@@ -73,10 +75,10 @@ class file:
     def get_file_acl_for_perms(self, perms):
         if self.get_sd():
             al = self.get_sd().get_acelist().get_untrusted().get_aces_with_perms(perms).get_aces()
-            if al == []:
+            if not al:
                 return None
-            else:
-                return fileAcl(self.get_name(), al)
+
+            return FileAcl(self.get_name(), al)
 
     def get_dangerous_aces(self):
         try:
@@ -98,10 +100,11 @@ class file:
         except:
             return []
 
-    # Can an untrusted user replace this file/dir? TODO unused
+    # Can an untrusted user replace this file/dir?
+    # TODO unused
     def is_replaceable(self):
         if not self.exists():
-            print "[W] is_replaceable called for non-existent file %s" % self.get_name()
+            print("[W] is_replaceable called for non-existent file %s" % self.get_name())
             return 0
 
         # There are a few things that could cause a file/dir to be replacable.  Firstly let's define "replaceable":
@@ -239,14 +242,13 @@ class file:
                 else:
                     self.sd = wpc.conf.cache.sd('file', sd)
             except:
-                print "WARNING: Can't get security descriptor for file: " + self.get_name()
+                print("WARNING: Can't get security descriptor for file: " + self.get_name())
                 self.sd = None
 
         return self.sd
     
     def as_tab(self, dangerous_only=1):
-        lines = []
-        lines.append(wpc.utils.tab_line("info", self.get_type(), str(self.get_name())))
+        lines = [wpc.utils.tab_line("info", self.get_type(), str(self.get_name()))]
         if self.get_sd():
             lines.append(wpc.utils.tab_line("gotsd", self.get_type(), str(self.get_name()), "yes"))
             lines.append(wpc.utils.tab_line("owner", self.get_type(), str(self.get_name()), str(self.get_sd().get_owner().get_fq_name())))         

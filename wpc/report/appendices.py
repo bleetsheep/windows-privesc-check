@@ -1,7 +1,7 @@
 import xml.etree.cElementTree as etree
-from wpc.report.appendix import appendix
 
-class appendices:
+
+class Appendices:
     def __init__(self):
         self.appendices = []
 

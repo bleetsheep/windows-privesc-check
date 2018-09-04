@@ -1,7 +1,9 @@
-from wpc.file import file as File
-from wpc.sd import sd
+from __future__ import print_function
+from wpc.file import File as File
+from wpc.sd import SD
 import win32net
 import wpc.conf
+import wpc.utils
 import pywintypes
 
 
@@ -44,7 +46,7 @@ class share:
                 self.type = shareinfo['type']
 
                 if shareinfo['security_descriptor']:
-                    self.sd = sd('share', shareinfo['security_descriptor'])
+                    self.sd = SD('share', shareinfo['security_descriptor'])
                 else:
                     self.sd = None
 
@@ -52,7 +54,7 @@ class share:
 
                 self.info = shareinfo
             except pywintypes.error as e:
-                print "[E] %s: %s" % (e[1], e[2])
+                print("[E] %s: %s" % (e[1], e[2]))
                 try:
                     shareinfo = win32net.NetShareGetInfo(wpc.conf.remote_server, self.get_name(), 501)
                     self.description = shareinfo['remark']
@@ -60,7 +62,7 @@ class share:
                     self.flags = shareinfo['flags']
                     self.info = shareinfo
                 except pywintypes.error as e:
-                    print "[E] %s: %s" % (e[1], e[2])
+                    print("[E] %s: %s" % (e[1], e[2]))
         return self.info
 
     def get_description(self):
@@ -144,8 +146,9 @@ class share:
         return t
     
     def as_tab(self, dangerous_only=1):
-        lines = []
-        lines.append(wpc.utils.tab_line("info", "share", str(self.get_name()), str(self.get_description()), str(self.get_path()), str(self.get_passwd()), str(self.get_current_uses()), str(self.get_max_uses())))
+        lines = [
+            wpc.utils.tab_line("info", "share", str(self.get_name()), str(self.get_description()), str(self.get_path()),
+                               str(self.get_passwd()), str(self.get_current_uses()), str(self.get_max_uses()))]
         if self.get_sd():
             lines.append(wpc.utils.tab_line("gotsd", "share", str(self.get_name()), "yes"))
             lines.append(wpc.utils.tab_line("owner", "share", str(self.get_name()), str(self.get_sd().get_owner().get_fq_name())))         

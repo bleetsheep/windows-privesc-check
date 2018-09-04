@@ -1,8 +1,8 @@
-import wpc.conf
-
+import wpc.conf, wpc.utils
 import xml.etree.cElementTree as etree
 
-class issue:
+
+class Issue:
     def __init__(self, identifier):
         self.id = identifier
         self.supporting_data = {}
@@ -38,13 +38,15 @@ class issue:
             for data in self.get_supporting_data(data_name):
                 s = data[0]
                 p = data[1]
-                etree.SubElement(d, 'data').text = "    %s (%s) which runs as %s has permission granted for: %s\n" % (s.get_description(), s.get_name(), s.get_run_as(), p.get_fq_name())
+                etree.SubElement(d, 'data').text = "    %s (%s) which runs as %s has permission granted for: %s\n" % \
+                                                   (s.get_description(), s.get_name(), s.get_run_as(), p.get_fq_name())
 
         elif data_name == 'principals_with_service_ownership':
             for data in self.get_supporting_data(data_name):
                 s = data[0]
                 p = data[1]
-                etree.SubElement(d, 'data').text = "    %s (%s) which runs as %s is owned by %s\n" % (s.get_description(), s.get_name(), s.get_run_as(), p.get_fq_name())
+                etree.SubElement(d, 'data').text = "    %s (%s) which runs as %s is owned by %s\n" % \
+                                                   (s.get_description(), s.get_name(), s.get_run_as(), p.get_fq_name())
 
         elif data_name == 'user_reg_keys':
             for data in self.get_supporting_data(data_name):

@@ -1,10 +1,11 @@
-from wpc.principal import principal
-from wpc.process import process
+from wpc.principal import Principal
+from wpc.process import Process
 import win32process
 import win32ts
 import wpc.conf
 import ctypes
 import win32con
+
 
 class PROCESSENTRY32(ctypes.Structure):
     _fields_ = [("dwSize", ctypes.c_ulong),
@@ -18,7 +19,8 @@ class PROCESSENTRY32(ctypes.Structure):
                                  ("dwFlags", ctypes.c_ulong),
                                  ("szExeFile", ctypes.c_char * 260)]
 
-class processes:
+
+class Processes(object):
     def __init__(self):
         self.processes = []
 
@@ -26,7 +28,7 @@ class processes:
         self.processes.append(p)
 
     def get_all(self):
-        if self.processes == []:
+        if not self.processes:
             pids = win32process.EnumProcesses()
             try:
                 proc_infos = win32ts.WTSEnumerateProcesses(wpc.conf.remote_server, 1, 0)
@@ -35,7 +37,7 @@ class processes:
                 pass
 
             for pid in pids:
-                p = process(pid)
+                p = Process(pid)
                 self.add(p)
 
             for proc_info in proc_infos:
@@ -45,7 +47,7 @@ class processes:
                     p.set_wts_session_id(proc_info[0])
                     p.set_wts_name(proc_info[2])
                     if proc_info[3]:  # sometimes None
-                        p.set_wts_sid(principal(proc_info[3]))
+                        p.set_wts_sid(Principal(proc_info[3]))
 
             TH32CS_SNAPPROCESS = 0x00000002
 

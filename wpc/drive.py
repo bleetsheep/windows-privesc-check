@@ -4,7 +4,7 @@ import win32file
 
 
 # NB: Only works for fixed drives - or you get "device not ready" error
-class drive():
+class Drive(object):
     def __init__(self, drivename):
         self.filesystem = None
         self.drivetype = None

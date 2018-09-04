@@ -1,12 +1,10 @@
-from wpc.ace import ace
 import ntsecuritycon
-import win32security
 
 
 # just a list of ACEs.  No owner, group, dacl, sd
 # we abstrace this out so we can chain searchs:
 # sd.get_aces_untrusted().get_aces_dangerous()
-class acelist:
+class AceList:
     def __init__(self):
         self.aces = []
         self.untrusted_acelist = None
@@ -22,7 +20,7 @@ class acelist:
         return self.aces
 
     def get_aces_for(self, principal):
-        a = acelist()
+        a = AceList()
         for ace in self.get_aces():
             if principal.get_sid() == ace.get_sid():
                 a.add(ace)
@@ -30,14 +28,14 @@ class acelist:
 
     def get_untrusted(self):
         if not self.untrusted_acelist:
-            self.untrusted_acelist = acelist()
+            self.untrusted_acelist = AceList()
             for ace in self.get_aces():
                 if not ace.get_principal().is_trusted():
                     self.untrusted_acelist.add(ace)
         return self.untrusted_acelist
 
     def get_dangerous_perms(self):
-        a = acelist()
+        a = AceList()
         for ace in self.get_aces():
             if not ace.get_perms_dangerous() == []:
                 newace = ace.copy()
@@ -46,7 +44,7 @@ class acelist:
         return a
 
     def get_dangerous_perms_read(self):
-        a = acelist()
+        a = AceList()
         for ace in self.get_aces():
             if not ace.get_perms_dangerous_read() == []:
                 newace = ace.copy()
@@ -55,7 +53,7 @@ class acelist:
         return a
 
     def get_aces_with_perms(self, perms):
-        a = acelist()
+        a = AceList()
         for ace in self.get_aces():
             found_perms = []
             for p in perms:
@@ -68,7 +66,7 @@ class acelist:
         return a
 
     def get_aces_except_for(self, principals):
-        a = acelist
+        a = AceList
         for ace in self.get_aces():
             trusted = 0
             for p in principals:

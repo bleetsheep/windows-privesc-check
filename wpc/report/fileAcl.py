@@ -1,16 +1,8 @@
-# report.issue
-# report.fileAcl
-# report.serviceFileAcl
-# report.serviceAcl
-# report.shareAcl
-# report.dirAcl?
-# report.registryKeyAcl
-
-from wpc.acelist import acelist
+from wpc.acelist import AceList
 
 
 # This is a bit like a file object, but we may be reporting only some of the ACEs from the DACL
-class fileAcl:
+class FileAcl:
     def __init__(self, f, a):
         self.acelist = None
         self.filename = None
@@ -18,7 +10,7 @@ class fileAcl:
         self.set_acelist(a)
 
     def set_acelist(self, aces):
-        self.acelist = acelist()
+        self.acelist = AceList()
         for ace in aces:
             self.acelist.add(ace)
 

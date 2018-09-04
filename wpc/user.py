@@ -1,12 +1,12 @@
 import wpc.conf
-from wpc.principal import principal
+from wpc.principal import Principal
 import win32net
 
 
 # These have properties such as active, workstations that groups don't have
-class user(principal):
+class User(Principal):
     def __init__(self, *args, **kwargs):
-        principal.__init__(self, *args, **kwargs)
+        Principal.__init__(self, *args, **kwargs)
         self.member_of = []
         self.effective_privileges = []
 
@@ -50,7 +50,7 @@ class user(principal):
         if self.member_of:
             return self.member_of
 
-        from wpc.group import group as Group # we have to import here to avoid circular import
+        from wpc.group import Group as Group # we have to import here to avoid circular import
 
         g1 = []
         g2 = []
@@ -59,10 +59,12 @@ class user(principal):
             g1 = win32net.NetUserGetLocalGroups(wpc.conf.remote_server, self.get_name(), 0)
         except:
             pass
+
         try:
             g2 = win32net.NetUserGetGroups(wpc.conf.remote_server, self.get_name())
         except:
             pass
+
         for g in g2:
             g1.append(g[0])
         for group in g1:

@@ -1,17 +1,16 @@
-from wpc.report.issues import issues
-from wpc.report.appendices import appendices
 import xml.etree.cElementTree as etree
 from lxml import etree as letree
-import os.path
-import sys
 import wpc.conf
+from wpc.report.appendices import Appendices
+from wpc.report.issues import Issues
+
 
 # A list of issues with some information about the scan
-class report():
+class Report(object):
     def __init__(self):
         self.info = {}
-        self.issues = issues()
-        self.appendices = appendices()
+        self.issues = Issues()
+        self.appendices = Appendices()
         self.xsl_text = '''<?xml version="1.0" encoding="ISO-8859-1"?>
 <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
 

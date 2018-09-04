@@ -1,27 +1,30 @@
 # Not a class
 # Just a collection of useful subs
-from wpc.cache import cache
-from wpc.file import file as File
-from wpc.process import process
-from wpc.group import group as Group
-from wpc.principal import principal
-from wpc.regkey import regkey
-from wpc.user import user
-import ctypes
-import ntsecuritycon
+from __future__ import print_function
+
 import os
 import re
+import sys
+import string
+import ctypes
+import ntsecuritycon
 import win32api
 import win32con
 import win32net
 import win32security
 import wpc.conf
-import string
-import sys
-import win32api
+import pywintypes
+
 k32 = ctypes.windll.kernel32
 wow64 = ctypes.c_long(0)
- 
+
+from wpc.principal import Principal
+from wpc.file import File
+from wpc.group import Group
+from wpc.user import User
+from wpc.process import Process
+from wpc.regkey import RegKey
+from wpc.cache import Cache
 
 # There some strange stuff that we need to do in order
 # We hide it all in here
@@ -30,7 +33,7 @@ wow64 = ctypes.c_long(0)
 #   remote_server can IP be None (should be None if on localhost)
 def init(options):
     # Print banner with version and URL
-#    print_banner()
+    #    print_banner()
 
     # Use some libs.  This will malfunction if we don't use them BEFORE we disable WOW64.
     load_libs()
@@ -47,29 +50,29 @@ def init(options):
 
     # Create cache object to cache SID lookups and other data
     # This is (or should) be used by many wpc.* classes
-    wpc.conf.cache = cache()
+    wpc.conf.cache = Cache()
 
     # Which permissions do we NOT care about? == who do we trust?
     define_trusted_principals(options)
 
     # Use the crendentials supplied (OK to call if no creds were supplied)
     impersonate(options.remote_user, options.remote_pass, options.remote_domain)
-    
+
     # calculate severity of issues from impact and ease
     max_impact = 5
     max_ease = 5
     for i in wpc.conf.issue_template.keys():
         impact = 0
         ease = 0
-        #print wpc.conf.issue_template[i]
+        # print wpc.conf.issue_template[i]
         if wpc.conf.issue_template[i]['impact']:
             impact = wpc.conf.issue_template[i]['impact']
         if wpc.conf.issue_template[i]['ease']:
             ease = wpc.conf.issue_template[i]['ease']
         severity = 100 * impact * ease / (max_impact * max_ease)
-        #print "[D] setting severity of %s to %s" % (i, severity)
+        # print "[D] setting severity of %s to %s" % (i, severity)
         wpc.conf.issue_template[i]['severity'] = severity
-    
+
 
 def tab_line(*fields):
     return "\t".join(map(str, fields))
@@ -80,11 +83,11 @@ def get_banner():
 
 
 def print_banner():
-    print get_banner()
+    print(get_banner())
 
 
 def get_version():
-    wpc.conf.version = "2.0" 
+    wpc.conf.version = "2.0"
     svnversion = "$Revision$"  # Don't change this line.  Auto-updated.
     svnnum = re.sub('[^0-9]', '', svnversion)
     if svnnum:
@@ -103,11 +106,14 @@ def get_extra_privs():
     # Problem: Vista+ support "Protected" processes, e.g. audiodg.exe.  We can't see info about these.
     # Interesting post on why Protected Process aren't really secure anyway: http://www.alex-ionescu.com/?p=34
 
-    th = win32security.OpenProcessToken(win32api.GetCurrentProcess(), win32con.TOKEN_ADJUST_PRIVILEGES | win32con.TOKEN_QUERY)
+    th = win32security.OpenProcessToken(win32api.GetCurrentProcess(),
+                                        win32con.TOKEN_ADJUST_PRIVILEGES | win32con.TOKEN_QUERY)
     privs = win32security.GetTokenInformation(th, ntsecuritycon.TokenPrivileges)
     newprivs = []
     for privtuple in privs:
-        if privtuple[0] == win32security.LookupPrivilegeValue(wpc.conf.remote_server, "SeBackupPrivilege") or privtuple[0] == win32security.LookupPrivilegeValue(wpc.conf.remote_server, "SeDebugPrivilege") or privtuple[0] == win32security.LookupPrivilegeValue(wpc.conf.remote_server, "SeSecurityPrivilege"):
+        if privtuple[0] == win32security.LookupPrivilegeValue(wpc.conf.remote_server, "SeBackupPrivilege") or \
+                privtuple[0] == win32security.LookupPrivilegeValue(wpc.conf.remote_server, "SeDebugPrivilege") or \
+                privtuple[0] == win32security.LookupPrivilegeValue(wpc.conf.remote_server, "SeSecurityPrivilege"):
             # print "Added privilege " + str(privtuple[0])
             # privtuple[1] = 2 # tuples are immutable.  WHY?!
             newprivs.append((privtuple[0], 2))  # SE_PRIVILEGE_ENABLED
@@ -136,26 +142,28 @@ def get_all_privs(th):
         win32security.AdjustTokenPrivileges(th, False, privs3)
 
 
-FILTER=''.join([(len(repr(chr(x))) == 3) and chr(x) or '.' for x in range(256)])
-def dump(src, length = 8):
+FILTER = ''.join([(len(repr(chr(x))) == 3) and chr(x) or '.' for x in range(256)])
+
+
+def dump(src, length=8):
     # Hex dump code from
     # http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/142812
 
-    N = 0
+    n = 0
     result = ''
     while src:
         s, src = src[:length], src[length:]
-        hexa = ' '.join(["%02X" % ord(x) for x in s])
+        hexa = ' '.join(["%02X" % ord(q) for q in s])
         su = s
         uni_string = ''
         for n in range(0, len(su) / 2):
             if su[n * 2 + 1] == "\0":
-                uni_string += unicode(su[n * 2:n * 2 + 1], errors = 'ignore')
+                uni_string += unicode(su[n * 2:n * 2 + 1], errors='ignore')
             else:
                 uni_string += '?'
         s = s.translate(FILTER)
-        result += "%04X %-*s%-16s %s\n" % (N, length * 3, hexa, s, uni_string)
-        N += length
+        result += "%04X %-*s%-16s %s\n" % (n, length * 3, hexa, s, uni_string)
+        n += length
     return result
 
 
@@ -205,6 +213,7 @@ def enable_wow64():
     except:
         pass
 
+
 # We don't report issues about permissions being held by trusted users or groups
 # hard-coded users and groups (wpc.conf.trusted_principals_fq[]) done
 # user-defined users and groups (--ignore) TODO
@@ -222,7 +231,7 @@ def define_trusted_principals(options):
         try:
             exploitable_by_fq = exploitable_by_fq + [line.strip() for line in open(options.exploitable_by_file)]
         except:
-            print "[E] Error reading from file %s" % options.exploitablebyfile
+            print("[E] Error reading from file %s" % options.exploitablebyfile)
             sys.exit()
     if options.ignore_principal_list:
         ignore_principals = options.ignore_principal_list
@@ -230,54 +239,54 @@ def define_trusted_principals(options):
         try:
             ignore_principals = ignore_principals + [line.strip() for line in open(options.ignoreprincipalfile)]
         except:
-            print "[E] Error reading from file %s" % options.ignoreprincipalfile
+            print("[E] Error reading from file %s" % options.ignoreprincipalfile)
             sys.exit()
-            
+
     # examine token, populate exploitable_by
     if options.exploitable_by_me:
         try:
-            p = process(os.getpid())
+            p = Process(os.getpid())
             wpc.conf.exploitable_by.append(p.get_token().get_token_owner())
             for g in p.get_token().get_token_groups():
                 if "|".join(g[1]).find("USE_FOR_DENY_ONLY") == -1:
                     wpc.conf.exploitable_by.append(g[0])
         except:
-            print "[E] Problem examining access token of current process"
+            print("[E] Problem examining access token of current process")
             sys.exit()
-    
+
     # check each of the supplied users in exploitable_by and exploitable_by resolve
-    
+
     if exploitable_by_fq or wpc.conf.exploitable_by:
         wpc.conf.privesc_mode = "exploitable_by"
         for t in exploitable_by_fq:
             try:
                 sid, _, _ = win32security.LookupAccountName(wpc.conf.remote_server, t)
                 if sid:
-                    p = principal(sid)
-                    #print "Trusted: %s (%s) [%s]" % (p.get_fq_name(), p.get_type_string(), p.is_group_type())
-                    #print "[D] Added trusted principal %s.  is group? %s" % (p.get_fq_name(), p.is_group_type())
+                    p = Principal(sid)
+                    # print "Trusted: %s (%s) [%s]" % (p.get_fq_name(), p.get_type_string(), p.is_group_type())
+                    # print "[D] Added trusted principal %s.  is group? %s" % (p.get_fq_name(), p.is_group_type())
                     if p.is_group_type():
                         p = Group(p.get_sid())
                     #    for m in p.get_members():
                     #        print "Member: %s" % m.get_fq_name()
                     else:
-                        p = user(p.get_sid())
+                        p = User(p.get_sid())
                     #    print p.get_groups()
-    
+
                     wpc.conf.exploitable_by.append(p)
-    
+
                 else:
-                    print "[E] can't look up sid for " + t
+                    print("[E] can't look up sid for " + t)
             except:
                 pass
-    
-        print "Only reporting privesc issues for these users/groups:"
+
+        print("Only reporting privesc issues for these users/groups:")
         for p in wpc.conf.exploitable_by:
-            print "* " + p.get_fq_name()        
+            print("* " + p.get_fq_name())
         return
     else:
         wpc.conf.privesc_mode = "report_untrusted"
-        
+
     # if user has specified list of trusted users, use only their list
     if ignore_principals:
         if options.ignorenoone:
@@ -287,31 +296,31 @@ def define_trusted_principals(options):
         # otherwise the user has not specified a list of trusted users.  we intelligently tweak the list.
         # Ignore "NT AUTHORITY\TERMINAL SERVER USER" if HKLM\System\CurrentControlSet\Control\Terminal Server\TSUserEnabled = 0 or doesn't exist
         # See http://support.microsoft.com/kb/238965 for details
-        r = regkey(r"HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\Terminal Server")
-    
+        r = RegKey(r"HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\Terminal Server")
+
         if r.is_present():
             v = r.get_value("TSUserEnabled")
             if v is None:
-                print "[i] TSUserEnabled registry value is absent. Excluding TERMINAL SERVER USER"
+                print("[i] TSUserEnabled registry value is absent. Excluding TERMINAL SERVER USER")
             elif v != 0:
-                print "[i] TSUserEnabled registry value is %s. Including TERMINAL SERVER USER" % v
+                print("[i] TSUserEnabled registry value is %s. Including TERMINAL SERVER USER" % v)
                 wpc.conf.trusted_principals_fq.append("NT AUTHORITY\TERMINAL SERVER USER")
             else:
-                print "[i] TSUserEnabled registry value is 0. Excluding TERMINAL SERVER USER"
+                print("[i] TSUserEnabled registry value is 0. Excluding TERMINAL SERVER USER")
         else:
-            print "[i] TSUserEnabled registry key is absent. Excluding TERMINAL SERVER USER"
-        print
+            print("[i] TSUserEnabled registry key is absent. Excluding TERMINAL SERVER USER")
+        print()
 
         # TODO we only want to ignore this if it doesn't resolve
         try:
             # Server Operators group
-            #print "[D] converting string sid"
-            #print "%s" % win32security.ConvertStringSidToSid("S-1-5-32-549")
+            # print "[D] converting string sid"
+            # print "%s" % win32security.ConvertStringSidToSid("S-1-5-32-549")
             p = Group(win32security.ConvertStringSidToSid("S-1-5-32-549"))
-    
+
         except:
             wpc.conf.trusted_principals.append(p)
-    
+
         # TODO this always ignored power users.  not what we want.
         # only want to ignore when group doesn't exist.
         try:
@@ -319,51 +328,53 @@ def define_trusted_principals(options):
             wpc.conf.trusted_principals.append(p)
         except:
             pass
-    
+
     # populate wpc.conf.trusted_principals with the objects corresponding to trusted_principals_fq
     for t in wpc.conf.trusted_principals_fq:
         try:
             sid, _, _ = win32security.LookupAccountName(wpc.conf.remote_server, t)
             if sid:
-                p = principal(sid)
-                #print "Trusted: %s (%s) [%s]" % (p.get_fq_name(), p.get_type_string(), p.is_group_type())
-                #print "[D] Added trusted principal %s.  is group? %s" % (p.get_fq_name(), p.is_group_type())
+                p = Principal(sid)
+                # print "Trusted: %s (%s) [%s]" % (p.get_fq_name(), p.get_type_string(), p.is_group_type())
+                # print "[D] Added trusted principal %s.  is group? %s" % (p.get_fq_name(), p.is_group_type())
                 if p.is_group_type():
                     p = Group(p.get_sid())
                 #    for m in p.get_members():
                 #        print "Member: %s" % m.get_fq_name()
                 else:
-                    p = user(p.get_sid())
+                    p = User(p.get_sid())
                 #    print p.get_groups()
 
                 wpc.conf.trusted_principals.append(p)
 
             else:
-                print "[E] can't look up sid for " + t
+                print("[E] can't look up sid for " + t)
         except:
             pass
 
-    print "Considering these users to be trusted:"
+    print("Considering these users to be trusted:")
     for p in wpc.conf.trusted_principals:
-        print "* " + p.get_fq_name()
-    print
+        print("* " + p.get_fq_name())
+    print()
 
 
 def looks_like_executable(s):
     if s is None:
         return 0
-    s = str(s) # doesn't work on int
-    re_string = r'\.' + r'$|\.'.join(wpc.conf.executable_file_extensions) + r'$'  # '\.exe$|\.py$|\.svn-base$|\.com$|\.bat$|\.dll$'
+    s = str(s)  # doesn't work on int
+    re_string = r'\.' + r'$|\.'.join(
+        wpc.conf.executable_file_extensions) + r'$'  # '\.exe$|\.py$|\.svn-base$|\.com$|\.bat$|\.dll$'
     re_exe = re.compile(re_string, re.IGNORECASE)
     m = re_exe.match(s)
     if m is None:
         return 0
     return 1
 
+
 def looks_like_path(s):
     if s is None:
         return 0
-    s = str(s) # doesn't work on int
+    s = str(s)  # doesn't work on int
     re_string = r'^\\\\|^[a-z]:\\|%systemroot%|%systemdrive%'
     re_exe = re.compile(re_string, re.IGNORECASE)
     m = re_exe.match(s)
@@ -371,10 +382,11 @@ def looks_like_path(s):
         return 0
     return 1
 
+
 def looks_like_registry_path(s):
     if s is None:
         return 0
-    s = str(s) # doesn't work on int
+    s = str(s)  # doesn't work on int
     re_string = r'^SYSTEM\\'
     re_exe = re.compile(re_string, re.IGNORECASE)
     m = re_exe.match(s)
@@ -382,10 +394,11 @@ def looks_like_registry_path(s):
         return 0
     return 1
 
+
 def looks_like_ip_address(s):
     if s is None:
         return 0
-    s = str(s) # doesn't work on int
+    s = str(s)  # doesn't work on int
     re_string = r'^d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$'
     re_exe = re.compile(re_string, re.IGNORECASE)
     m = re_exe.match(s)
@@ -393,16 +406,18 @@ def looks_like_ip_address(s):
         return 0
     return 1
 
+
 def looks_like_user(s):
     if s is None:
         return 0
-    s = str(s) # doesn't work on int
+    s = str(s)  # doesn't work on int
     re_string = r'^administrator|^system[^\\]|NT AUTHORITY\\|BUILTIN\\'
     re_exe = re.compile(re_string, re.IGNORECASE)
     m = re_exe.match(s)
     if m is None:
         return 0
     return 1
+
 
 # Walk a directory tree, returning all matching files
 #
@@ -412,25 +427,25 @@ def looks_like_user(s):
 #   inc_dirs    whether to return dirs or not # TODO need option to only return dirs that contain files of interest
 # TODO what if we pass a non-existent directory?
 def dirwalk(directory, extensions, include_dirs):
-
     # Compile regular expression for file entension matching
     re_string = r'\.' + r'$|\.'.join(extensions)  # '\.exe$|\.py$|\.svn-base$|\.com$|\.bat$|\.dll$'
     re_exe = re.compile(re_string, re.IGNORECASE)
 
     for root, dirs, files in oswalk(directory):
-            #print "root=%s, dirs=%s, files=%s" % (root, dirs, files)
-            yield root
+        # print "root=%s, dirs=%s, files=%s" % (root, dirs, files)
+        yield root
 
-            for file in files:
-                m = re_exe.search(file)
-                if m is None:
-                    continue
-                else:
-                    yield root + "\\" + file
+        for f in files:
+            m = re_exe.search(f)
+            if m is None:
+                continue
+            else:
+                yield root + "\\" + f
 
-            if include_dirs:
-                for directory in dirs:
-                    yield root + "\\" + directory
+        if include_dirs:
+            for directory in dirs:
+                yield root + "\\" + directory
+
 
 # Copy of os.walk with minor mod to detect reparse points
 def oswalk(top, topdown=True, onerror=None, followlinks=False):
@@ -461,17 +476,17 @@ def oswalk(top, topdown=True, onerror=None, followlinks=False):
     if not topdown:
         yield top, dirs, nondirs
 
-        
+
 def is_reparse_point(d):
-            try:
-                attr = win32api.GetFileAttributes(d)
-                # reparse point http://msdn.microsoft.com/en-us/library/windows/desktop/gg258117(v=vs.85).aspx
-                if attr & 0x400:
-                    print "[D] Is reparse point: %s" % d
-                    return 1
-            except:
-                pass
-            return 0
+    try:
+        attr = win32api.GetFileAttributes(d)
+        # reparse point http://msdn.microsoft.com/en-us/library/windows/desktop/gg258117(v=vs.85).aspx
+        if attr & 0x400:
+            print("[D] Is reparse point: %s" % d)
+            return 1
+    except:
+        pass
+    return 0
 
 
 # arg s contains windows-style env vars like: %windir%\foo
@@ -483,9 +498,9 @@ def env_expand(s):
 def find_in_path(f):
     f_str = f.get_name()
     for d in os.environ.get('PATH').split(';'):
-        #print "[D] looking in path for %s" % d + "\\" + f_str
+        # print "[D] looking in path for %s" % d + "\\" + f_str
         if os.path.exists(d + "\\" + f_str):
-            #print "[D] found in path %s" % d + "\\" + f_str
+            # print "[D] found in path %s" % d + "\\" + f_str
             return File(d + "\\" + f_str)
     return None
 
@@ -496,20 +511,21 @@ def lookup_files_for_clsid(clsid):
     # http://msdn.microsoft.com/en-us/library/windows/desktop/ms691424(v=vs.85).aspx
 
     for v in ("InprocServer", "InprocServer32", "LocalServer", "LocalServer32"):
-        r = regkey("HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\CLSID\\" + clsid + "\\" + v)
+        r = RegKey("HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\CLSID\\" + clsid + "\\" + v)
         if r.is_present:
             d = r.get_value("")  # "(Default)" value
             if d:
                 d = env_expand(d)
                 results.append([r, v, File(d)])
-#    else:
-#        print "[i] Skipping non-existent clsid: %s" % r.get_name()
+    #    else:
+    #        print "[i] Skipping non-existent clsid: %s" % r.get_name()
 
     return results
 
 
 def expander(mo):
     return os.environ.get(mo.group()[1:-1], 'UNKNOWN')
+
 
 def to_printable(s):
     try:
@@ -520,7 +536,7 @@ def to_printable(s):
         pass
     newstring = ""
 
-    try:    
+    try:
         for c in s:
             if c in string.printable:
                 newstring = newstring + c
@@ -529,6 +545,7 @@ def to_printable(s):
         return newstring
     except:
         return "[WPC internal error parsing this string]"
+
 
 def dequote(binary_dirty):
     # remove quotes and leading white space
@@ -539,9 +556,10 @@ def dequote(binary_dirty):
     else:
         if m:
             binary_dirty = m.group(1)
-            
+
     return binary_dirty
-    
+
+
 # Attempts to clean up strange looking file paths like:
 #   \??\C:\WINDOWS\system32\csrss.exe
 #   \SystemRoot\System32\smss.exe
@@ -599,20 +617,22 @@ def get_exe_path_clean(binary_dirty):
 
 def impersonate(username, password, domain):
     if username:
-        print "Using alternative credentials:"
-        print "Username: " + str(username)
-        print "Password: " + str(password)
-        print "Domain:   " + str(domain)
-        handle = win32security.LogonUser(username, domain, password, win32security.LOGON32_LOGON_NEW_CREDENTIALS, win32security.LOGON32_PROVIDER_WINNT50)
+        print("Using alternative credentials:")
+        print("Username: " + str(username))
+        print("Password: " + str(password))
+        print("Domain:   " + str(domain))
+        handle = win32security.LogonUser(username, domain, password, win32security.LOGON32_LOGON_NEW_CREDENTIALS,
+                                         win32security.LOGON32_PROVIDER_WINNT50)
         win32security.ImpersonateLoggedOnUser(handle)
     else:
-        print "[i] Running as current user.  No logon creds supplied (-u, -D, -p)."
-    print
+        print("[i] Running as current user.  No logon creds supplied (-u, -D, -p).")
+    print()
+
 
 def populate_scaninfo(report):
     import socket
     import datetime
-    
+
     report.add_info_item('privesc_mode', wpc.conf.privesc_mode)
     if wpc.conf.privesc_mode == "report_untrusted":
         report.add_info_item('exploitable_by', "N/A (running in report_untrusted mode)")
@@ -626,16 +646,18 @@ def populate_scaninfo(report):
         for e in wpc.conf.exploitable_by:
             exploitable_by.append(e.get_fq_name())
         report.add_info_item('exploitable_by', ",".join(exploitable_by))
-        
+
     report.add_info_item('hostname', socket.gethostname())
     report.add_info_item('datetime', datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
     report.add_info_item('version', wpc.utils.get_version())
     report.add_info_item('user', os.environ['USERDOMAIN'] + "\\" + os.environ['USERNAME'])
     report.add_info_item('domain', win32api.GetDomainName())
-    ver_list = win32api.GetVersionEx(1) # bug on windows 8.1  https://msdn.microsoft.com/en-us/library/windows/desktop/ms724451%28v=vs.85%29.aspx
+    ver_list = win32api.GetVersionEx(
+        1)  # bug on windows 8.1  https://msdn.microsoft.com/en-us/library/windows/desktop/ms724451%28v=vs.85%29.aspx
 
     try:
-        report.add_info_item('ipaddress', ",".join(socket.gethostbyname_ex(socket.gethostname())[2]))  # have to do this before Wow64DisableWow64FsRedirection
+        report.add_info_item('ipaddress', ",".join(
+            socket.gethostbyname_ex(socket.gethostname())[2]))  # have to do this before Wow64DisableWow64FsRedirection
     except:
         report.add_info_item('ipaddress', "<unknown>")  # have to do this before Wow64DisableWow64FsRedirection
 
@@ -645,11 +667,7 @@ def populate_scaninfo(report):
     prod_type = ver_list[8]
 
     # version numbers from http://msdn.microsoft.com/en-us/library/ms724832(VS.85).aspx
-    os_name = {}
-    os_name[4] = {}
-    os_name[5] = {}
-    os_name[6] = {}
-    os_name[10] = {}
+    os_name = {4: {}, 5: {}, 6: {}, 10: {}}
     os_name[4][0] = {}
     os_name[6][0] = {}
     os_name[5][0] = {}
@@ -676,7 +694,7 @@ def populate_scaninfo(report):
     os_name[10][0][1] = "Windows 10"
 
     search_prod_type = prod_type
-    if prod_type == 2: # domain controller
+    if prod_type == 2:  # domain controller
         search_prod_type = 3
     if major in os_name.keys() and minor in os_name[major].keys() and search_prod_type in os_name[major][minor].keys():
         os_str = os_name[major][minor][search_prod_type]
@@ -688,13 +706,15 @@ def populate_scaninfo(report):
         report.add_info_item('is_domain_controller', "yes")
     else:
         report.add_info_item('is_domain_controller', "no")
-    report.add_info_item('os_version', str(ver_list[0]) + "." + str(ver_list[1]) + "." + str(ver_list[2]) + " SP" + str(ver_list[5]))
+    report.add_info_item('os_version',
+                         str(ver_list[0]) + "." + str(ver_list[1]) + "." + str(ver_list[2]) + " SP" + str(ver_list[5]))
 
 
 def get_system_path():
     key_string = 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment'
     try:
-        keyh = win32api.RegOpenKeyEx(win32con.HKEY_LOCAL_MACHINE, key_string , 0, win32con.KEY_ENUMERATE_SUB_KEYS | win32con.KEY_QUERY_VALUE | win32con.KEY_READ)
+        keyh = win32api.RegOpenKeyEx(win32con.HKEY_LOCAL_MACHINE, key_string, 0,
+                                     win32con.KEY_ENUMERATE_SUB_KEYS | win32con.KEY_QUERY_VALUE | win32con.KEY_READ)
     except:
         return None
 
@@ -708,46 +728,51 @@ def get_system_path():
 
 def get_user_paths():
     try:
-        keyh = win32api.RegOpenKeyEx(win32con.HKEY_USERS, None , 0, win32con.KEY_ENUMERATE_SUB_KEYS | win32con.KEY_QUERY_VALUE | win32con.KEY_READ)
+        keyh = win32api.RegOpenKeyEx(win32con.HKEY_USERS, None, 0,
+                                     win32con.KEY_ENUMERATE_SUB_KEYS | win32con.KEY_QUERY_VALUE | win32con.KEY_READ)
     except:
         return 0
     paths = []
-    import pywintypes
+
     subkeys = win32api.RegEnumKeyEx(keyh)
     for subkey in subkeys:
-            #print subkey
+        # print subkey
+        try:
+            subkeyh = win32api.RegOpenKeyEx(keyh, subkey[0] + "\\Environment", 0,
+                                            win32con.KEY_ENUMERATE_SUB_KEYS | win32con.KEY_QUERY_VALUE | win32con.KEY_READ)
+            path, type = win32api.RegQueryValueEx(subkeyh, "PATH")
             try:
-                subkeyh = win32api.RegOpenKeyEx(keyh, subkey[0] + "\\Environment" , 0, win32con.KEY_ENUMERATE_SUB_KEYS | win32con.KEY_QUERY_VALUE | win32con.KEY_READ)
-                path, type = win32api.RegQueryValueEx(subkeyh, "PATH")
-                try:
-                    user_sid  = win32security.ConvertStringSidToSid(subkey[0])
-                except:
-                    #print "WARNING: Can't convert sid %s to name.  Skipping." % subkey[0]
-                    continue
-                #print "subkey: %s" % subkey[0]
-                paths.append([user(user_sid), path])
-            except pywintypes.error as e:
-                #print e
-                pass
+                user_sid = win32security.ConvertStringSidToSid(subkey[0])
+            except:
+                # print "WARNING: Can't convert sid %s to name.  Skipping." % subkey[0]
+                continue
+            # print "subkey: %s" % subkey[0]
+            paths.append([User(user_sid), path])
+        except pywintypes.error as e:
+            # print e
+            pass
     return paths
 
+
 def dump_options(options):
-    print "[+] Runtime Options Dump"
-    optdict = options.__dict__ 
+    print("[+] Runtime Options Dump")
+    optdict = options.__dict__
     optdict["privesc_mode"] = wpc.conf.privesc_mode
+
     for k in sorted(optdict.keys()):
-        if k == "dump_mode" and optdict[k] == True:
-            print " mode: dump"
-        if k == "dumptab_mode" and optdict[k] == True:
-            print " mode: dumptab"
-        if k == "audit_mode" and optdict[k] == True:
-            print " mode: audit"
+        if k == "dump_mode" and optdict[k]:
+            print(" mode: dump")
+        if k == "dumptab_mode" and optdict[k]:
+            print(" mode: dumptab")
+        if k == "audit_mode" and optdict[k]:
+            print(" mode: audit")
+
     for k in sorted(optdict.keys()):
         if k == "privesc_mode" or k.find("_mode") == -1:
             if k == "ignore_principal_list":
-                print " %s: %s" % (k, wpc.conf.trusted_principals_fq)
+                print(" %s: %s" % (k, wpc.conf.trusted_principals_fq))
             elif k == "exploitable_by_list":
-                print " %s: %s" % (k, map(lambda g: g.get_fq_name(), wpc.conf.exploitable_by))
+                print(" %s: %s" % (k, map(lambda g: g.get_fq_name(), wpc.conf.exploitable_by)))
             elif k.find("interesting") != -1 and optdict['do_allfiles'] == False:
                 pass
             elif k.find("exploitable_by") != -1 and optdict['privesc_mode'] != 'exploitable_by':
@@ -755,21 +780,23 @@ def dump_options(options):
             elif k.find("get_") != -1 and optdict['audit_mode'] == True:
                 pass
             else:
-                print " %s: %s" % (k, optdict[k])
-    
+                print(" %s: %s" % (k, optdict[k]))
+
 
 def print_major(message, *args):
     indent = 0
     if args:
         indent = args[0]
-    print "%s[+] %s" % (" " * indent, message)
-    
+    print("%s[+] %s" % (" " * indent, message))
+
 
 def printline(message):
-    print "\n============ %s ============" % message
+    print("\n============ %s ============" % message)
+
 
 def section(message):
-    print "\n[+] Running: %s" % message
+    print("\n[+] Running: %s" % message)
+
 
 # is v1 <= v2?  e.g. is 1.21.3 <= 1.2.3 (no in this case)
 def version_less_than_or_equal_to(v1, v2):
@@ -779,6 +806,7 @@ def version_less_than_or_equal_to(v1, v2):
     if v2 == highest:
         return 1
     return 0
+
 
 def host_is_dc():
     return win32api.GetVersionEx(1)[8] == 2

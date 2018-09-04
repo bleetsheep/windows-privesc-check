@@ -1,7 +1,9 @@
-from wpc.report.issue import issue
 import xml.etree.cElementTree as etree
+from operator import methodcaller
+
 from lxml import etree as letree
-from operator import itemgetter, attrgetter, methodcaller
+
+from wpc.report.issue import Issue
 
 
 # TODO should this class contain info about the scan?  or define a new class called report?
@@ -9,7 +11,7 @@ from operator import itemgetter, attrgetter, methodcaller
 # Date, time of audit
 # Who the audit ran as (username, groups, privs)
 # ...
-class issues:
+class Issues:
     def __init__(self):
         self.issues = []
 
@@ -20,7 +22,7 @@ class issues:
                 return i
 
         # create new issue
-        i = issue(identifier)
+        i = Issue(identifier)
         self.add_issue(i)
         return i
 

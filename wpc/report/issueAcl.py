@@ -6,11 +6,11 @@
 # report.dirAcl?
 # report.registryKeyAcl
 
-from wpc.acelist import acelist
+from wpc.acelist import AceList
 
 
 # This is a genric ACL that can be rendered in a report
-class issueAcl:
+class IssueAcl:
     def __init__(self, n, a):
         self.acelist = None
         self.name = None
@@ -18,7 +18,7 @@ class issueAcl:
         self.set_acelist(a)
 
     def set_acelist(self, aces):
-        self.acelist = acelist()
+        self.acelist = AceList()
         for ace in aces:
             self.acelist.add(ace)
 

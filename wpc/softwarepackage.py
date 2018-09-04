@@ -1,7 +1,9 @@
 import wpc.utils
 import re
+import wpc.conf
 
-class softwarepackage():
+
+class SoftwarePackage(object):
     def __init__(self, packagekey):
         self.packagekey = packagekey
         self.name = wpc.utils.to_printable(packagekey.get_value("DisplayName"))
@@ -64,4 +66,3 @@ class softwarepackage():
                             return 1
                         
                     return 0
-                            

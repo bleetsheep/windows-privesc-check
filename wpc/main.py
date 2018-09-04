@@ -1,25 +1,23 @@
-from wpc.parseOptions import parseOptions
-from wpc.report.report import report
-from wpc.audit.dump import dump
-from wpc.audit.dumptab import dumptab
-from wpc.audit.audit import audit
-import wpc.utils
+from __future__ import print_function
 import datetime
-import time
 import sys
+import time
+from wpc.audit import Audit, Dump, DumpTab
+from wpc.report import Report
+from wpc.parseOptions import parse_options
+import wpc.utils
 
 
-# ------------------------ Main Code Starts Here ---------------------
 def main():
     # Parse command line arguments
-    options = parseOptions()
+    options = parse_options()
 
     # Initialise WPC
     # TODO be able to enable/disable caching
     wpc.utils.init(options)
 
     # Object to hold all the issues we find
-    report = report()
+    report = Report()
     wpc.utils.populate_scaninfo(report)
     issues = report.get_issues()
 
@@ -32,22 +30,24 @@ def main():
 
     wpc.utils.dump_options(options)
 
-    wpc.utils.printline("Starting Audit at %s" % datetime.datetime.strftime(datetime.datetime.now(), '%Y-%m-%d %H:%M:%S'))
+    wpc.utils.printline("Starting Audit at %s" %
+                        datetime.datetime.strftime(datetime.datetime.now(),
+                                                   '%Y-%m-%d %H:%M:%S'))
     start_time = time.time()
 
     # Dump raw data if required
     if options.dump_mode:
-        d = dump(options)
+        d = Dump(options)
         d.run()
 
     # Dump raw data if required
     if options.dumptab_mode:
-        d = dumptab(options, report)
+        d = DumpTab(options, report)
         d.run()
 
     # Identify security issues
     if options.audit_mode:
-        a = audit(options, report)
+        a = Audit(options, report)
         a.run()
 
         if options.report_file_stem:
@@ -57,7 +57,7 @@ def main():
             print()
 
             filename = "%s.xml" % options.report_file_stem
-            print "[+] Saving report file %s" % filename
+            print("[+] Saving report file %s" % filename)
             f = open(filename, 'w')
             f.write(report.as_xml_string())
             f.close()

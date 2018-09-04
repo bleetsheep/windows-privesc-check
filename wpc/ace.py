@@ -1,9 +1,9 @@
-from wpc.principal import principal
+from wpc.principal import Principal
 import ntsecuritycon
 import wpc.conf
 
 
-class ace:
+class Ace:
     def __init__(self, otype, ace):
         self.set_ace(ace)
         self.type = None
@@ -14,7 +14,7 @@ class ace:
         self.set_sid(ace[2])
         self.set_dperms([])
         self.set_dpermsread([])
-        self.set_principal(principal(ace[2]))
+        self.set_principal(Principal(ace[2]))
         self.set_perms(self.resolve_perms())
 
     def get_type(self):
@@ -87,7 +87,7 @@ class ace:
         return self.ace
 
     def copy(self):
-        new = ace(self.get_otype(), self.get_ace())
+        new = Ace(self.get_otype(), self.get_ace())
         return new
 
     def set_perms(self, perms):

@@ -1,15 +1,18 @@
-from wpc.file import file as File
-from wpc.regkey import regkey
-from wpc.sd import sd
+from __future__ import print_function
+from __future__ import print_function
 import os
 import re
 import win32con
 import win32security
 import win32service
+from wpc.file import File as File
+from wpc.regkey import RegKey
+from wpc.sd import SD
 import wpc.conf
+import wpc.utils
 
 
-class service:
+class Service(object):
     def __init__(self, scm, short_name):
         self.scm = scm
         self.name = short_name
@@ -44,19 +47,21 @@ class service:
     # get the maximum info about each service.
 
     def get_sh_query_config(self):
-        if not self.sh_query_config:    
+        if not self.sh_query_config:
             try:
-                self.sh_query_config = win32service.OpenService(self.get_scm(), self.get_name(), win32service.SERVICE_QUERY_CONFIG)
+                self.sh_query_config = win32service.OpenService(self.get_scm(), self.get_name(),
+                                                                win32service.SERVICE_QUERY_CONFIG)
 
             except:
-                print "Service Perms: Unknown (Access Denied)"
+                print("Service Perms: Unknown (Access Denied)")
 
         return self.sh_query_config
 
     def get_sh_query_status(self):
         if not self.sh_query_status:
             try:
-                self.sh_query_status = win32service.OpenService(self.get_scm(), self.get_name(), win32service.SERVICE_QUERY_STATUS)
+                self.sh_query_status = win32service.OpenService(self.get_scm(), self.get_name(),
+                                                                win32service.SERVICE_QUERY_STATUS)
             except:
                 pass
         return self.sh_query_status
@@ -89,10 +94,11 @@ class service:
         if not self.sd:
             # Need a handle with generic_read
             try:
-                secdesc = win32service.QueryServiceObjectSecurity(self.get_sh_read_control(), win32security.OWNER_SECURITY_INFORMATION | win32security.DACL_SECURITY_INFORMATION)
-                self.sd = sd('service', secdesc)
+                secdesc = win32service.QueryServiceObjectSecurity(self.get_sh_read_control(),
+                                                                  win32security.OWNER_SECURITY_INFORMATION | win32security.DACL_SECURITY_INFORMATION)
+                self.sd = SD('service', secdesc)
             except:
-                print "ERROR: OpenService failed for '%s' (%s)" % (self.get_description(), self.get_name())
+                print("ERROR: OpenService failed for '%s' (%s)" % (self.get_description(), self.get_name()))
 
         return self.sd
 
@@ -198,17 +204,17 @@ class service:
 
     def get_type_name(self):
         if not self.typename:
-                type = self.get_type()
-                if type == "KERNEL_DRIVER":
-                    self.typename = "driver"
-                elif type == "FILE_SYSTEM_DRIVER":
-                    self.typename = "driver"
-                elif type == "WIN32_SHARE_PROCESS":
-                    self.typename = "service"
-                elif type == "WIN32_OWN_PROCESS":
-                    self.typename = "service"
+            type = self.get_type()
+            if type == "KERNEL_DRIVER":
+                self.typename = "driver"
+            elif type == "FILE_SYSTEM_DRIVER":
+                self.typename = "driver"
+            elif type == "WIN32_SHARE_PROCESS":
+                self.typename = "service"
+            elif type == "WIN32_OWN_PROCESS":
+                self.typename = "service"
         return self.typename
-        
+
     def get_startup_type(self):
         if not self.startup_type:
             self.startup_type = self.get_service_info(1)
@@ -244,7 +250,8 @@ class service:
     def get_service_config_failure_actions(self):
         if not self.service_config_failure_actions:
             try:
-                self.service_config_failure_actions = win32service.QueryServiceConfig2(self.get_sh_query_config(), win32service.SERVICE_CONFIG_FAILURE_ACTIONS)
+                self.service_config_failure_actions = win32service.QueryServiceConfig2(self.get_sh_query_config(),
+                                                                                       win32service.SERVICE_CONFIG_FAILURE_ACTIONS)
             except:
                 pass
             if not self.service_config_failure_actions:
@@ -254,7 +261,8 @@ class service:
     def get_service_sid_type(self):
         if not self.service_sid_type:
             try:
-                self.service_sid_type = win32service.QueryServiceConfig2(self.get_sh_query_config(), win32service.SERVICE_CONFIG_SERVICE_SID_INFO)
+                self.service_sid_type = win32service.QueryServiceConfig2(self.get_sh_query_config(),
+                                                                         win32service.SERVICE_CONFIG_SERVICE_SID_INFO)
                 if self.service_sid_type == 0:
                     self.service_sid_type = "SERVICE_SID_TYPE_NONE"
                 if self.service_sid_type == 1:
@@ -268,7 +276,8 @@ class service:
     def get_long_description(self):
         if not self.long_description:
             try:
-                self.long_description = win32service.QueryServiceConfig2(self.get_sh_query_config(), win32service.SERVICE_CONFIG_DESCRIPTION)
+                self.long_description = win32service.QueryServiceConfig2(self.get_sh_query_config(),
+                                                                         win32service.SERVICE_CONFIG_DESCRIPTION)
             except:
                 pass
             if not self.long_description:
@@ -286,7 +295,7 @@ class service:
 
     def _as_tab_delim(self, flag):
         return "%s\t%s\t%s\t%s" % (wpc.conf.remote_server, self.get_name(), self.get_run_as(), self.get_exe_path())
-        
+
     def _as_text(self, flag):
         t = ""
         t += "---------------------------------------\n"
@@ -295,7 +304,8 @@ class service:
         t += "Type:           " + str(self.get_type()) + "\n"
         t += "Status:         " + str(self.get_status()) + "\n"
         t += "Startup:        " + str(self.get_startup_type()) + "\n"
-        t += "Long Desc:      " + self.removeNonAscii(self.get_long_description()) + "\n"  # in case of stupid chars in desc
+        t += "Long Desc:      " + self.removeNonAscii(
+            self.get_long_description()) + "\n"  # in case of stupid chars in desc
         t += "Binary:         " + self.get_exe_path() + "\n"
         if self.get_exe_path_clean():
             t += "Binary (clean): " + self.get_exe_path_clean() + "\n"
@@ -334,22 +344,21 @@ class service:
 
         t += "\n"
         return t
-        return t
 
     def get_reg_key(self):
         if not self.reg_key:
-            self.reg_key = regkey("HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\" + self.get_name())
+            self.reg_key = RegKey("HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\" + self.get_name())
         return self.reg_key
 
-    def removeNonAscii(self, s): 
+    def removeNonAscii(self, s):
         return "".join(i for i in s if ord(i) < 128)
-    
+
     def as_tab(self, dangerous_only=1):
-        lines = []
-        lines.append(wpc.utils.tab_line("info", self.get_type_name(), str(self.get_name())))
+        lines = [wpc.utils.tab_line("info", self.get_type_name(), str(self.get_name()))]
         if self.get_sd():
             lines.append(wpc.utils.tab_line("gotsd", self.get_type_name(), str(self.get_name()), "yes"))
-            lines.append(wpc.utils.tab_line("owner", self.get_type_name(), str(self.get_name()), str(self.get_sd().get_owner().get_fq_name())))         
+            lines.append(wpc.utils.tab_line("owner", self.get_type_name(), str(self.get_name()),
+                                            str(self.get_sd().get_owner().get_fq_name())))
             if self.get_sd().has_dacl():
                 lines.append(wpc.utils.tab_line("hasdacl", self.get_type_name(), str(self.get_name()), "yes"))
                 if dangerous_only:
@@ -360,5 +369,5 @@ class service:
                 lines.append(wpc.utils.tab_line("hasdacl", self.get_type_name(), str(self.get_name()), "no"))
         else:
             lines.append(wpc.utils.tab_line("gotsd", self.get_type_name(), str(self.get_name()), "no"))
-        #print lines
+        # print lines
         return "\n".join(lines)

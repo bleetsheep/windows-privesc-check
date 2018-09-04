@@ -1,6 +1,7 @@
 import wpc.utils
 
-class scheduledtask():
+
+class ScheduledTask(object):
     def __init__(self, name, root):
             self.root = root
             self.name = name
@@ -225,4 +226,3 @@ class scheduledtask():
         t += "command_path: %s\n" % self.get_command_path()
         t += "command_args: %s\n" % self.get_command_args()
         return t
-    

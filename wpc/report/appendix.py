@@ -1,7 +1,8 @@
-import wpc.conf
+import wpc.conf, wpc.utils
 import xml.etree.cElementTree as etree
 
-class appendix:
+
+class Appendix:
     def __init__(self, title):
         self.title = title
         self.preamble = None
